@@ -36,14 +36,14 @@ class UpdateRoomStatusBeforeCheckIn extends Command
             if ($booking->status_id === 1) {
                 $room = $booking->room;
                 if ($room) {
-                    $room->status_room_id = 3; // Cập nhật trạng thái phòng thành 3
+                    $room->status_room_id = 3; // Cập nhật trạng thái phòng thành 3="khách đã đặt"
                     $room->save();
                     $this->info("Updated room {$room->id} to status 3 for check-in date {$booking->check_in_date}.");
                 }
             }else if ($booking->status_id === 5) {
                 $room = $booking->room;
                 if ($room) {
-                    $room->status_room_id = 1;
+                    $room->status_room_id = 1;// Cập nhật trạng thái phòng thành 1="phòng trống"
                     $room->save();
                     $this->info("Updated room {$room->id} to status 3 for check-in date {$booking->check_in_date}.");
                 }
