@@ -19,6 +19,7 @@ class RoomController extends Controller
         $perPage = $request->get('perPage');
 
         $rooms = Room::with('roomType', 'status', 'convenients', 'images')->paginate($perPage);
+        $emptyrooms = Room::with('roomType', 'status', 'convenients', 'images')->where('status_room_id', '=', '1')->paginate($perPage);
         $all = Room::with('status', 'images')->get();
         // $roomforuser = Room::with('status', 'images')->get();
 
@@ -34,6 +35,7 @@ class RoomController extends Controller
             'code' => 200,
             'data' => $rooms,
             'all' => $all,
+            'emptyrooms' => $emptyrooms,
         ], 200);
     }
 

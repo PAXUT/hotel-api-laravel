@@ -52,10 +52,13 @@ class BookingController extends Controller
 
             $all = Booking::with(['user', 'room'])->get();
 
+            $refund = Booking::with(['user', 'room'])->where('refund', '!=', 'none')->paginate($perPage);
+
             return response()->json([
                 'status' => 'success',
                 'data' => $bookings,
                 'all' => $all,
+                'refund' => $refund,
             ], 200);
         } catch (\Exception $e) {
             Log::error('Get bookings error: ' . $e->getMessage());
