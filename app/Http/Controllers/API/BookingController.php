@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Events\BookingStatusUpdated;
+use App\Events\RoomStatusUpdated;
+use Carbon\Carbon;
 
 class BookingController extends Controller
 {
@@ -25,7 +28,7 @@ class BookingController extends Controller
 
         try {
             if ($user->role !== '1') {
-                $booking = Booking::with('status')->where('user_id', $user->id)->paginate($perPage);
+                $booking = Booking::with('status', 'room', 'user')->where('user_id', $user->id)->orderBy('id', 'desc')->paginate($perPage);
                 return response()->json([
                     'message' => 'Lấy danh sách cho user thành công',
                     'data' => $booking,
@@ -87,9 +90,11 @@ class BookingController extends Controller
             'guest' => $request->guest,
             'total_price' => $request->total_price,
             'payment_method' => 'cod',
-            'status_id' => '3',
+            'status_id' => '3',     
             'payment_status' => 'unpaid',
+            'payment_countdown' => Carbon::now()->addMinutes(30),
         ]);
+        event(new BookingStatusUpdated($booking));
         if (!$booking) {
             return response()->json(['message' => 'Không tìm thấy booking', 'code' => 404], 404);
         }
@@ -145,7 +150,7 @@ class BookingController extends Controller
 
             $vnp_SecureHash = hash_hmac('sha512', $hashData, env('VNP_HASH_SECRET'));
             $paymentUrl = env('VNP_URL') . '?' . $query . '&vnp_SecureHash=' . $vnp_SecureHash;
-
+            
             DB::commit();
             return response()->json(['payUrl' => $paymentUrl]);
         } catch (\Exception $e) {
@@ -304,7 +309,7 @@ class BookingController extends Controller
             'payment_status' => 'paid',
             'payment_reference' => $inputData['vnp_TransactionNo'] ?? null,
         ]);
-
+        event(new BookingStatusUpdated($booking));
         return response()->json([
             'status' => 'success',
             'message' => 'Thanh toán VNPAY thành công!',
@@ -357,9 +362,6 @@ class BookingController extends Controller
             $roomStatus = null;
 
             switch ($validated['status_id']) {
-                // case 1:
-                //     $roomStatus = 3;
-                //     break;
                 case 6:
                     $roomStatus = 2;
                     break;
@@ -376,10 +378,12 @@ class BookingController extends Controller
                 $booking->review = 1;
                 $booking->save();
             }
-            if ($booking->payment_method === "vnpay" && ($booking->status_id === 2 || $booking->status_id === 4 || $booking->status_id === 5 )) {
+            if ($booking->payment_method === "vnpay" && ($booking->status_id === 2 || $booking->status_id === 4 || $booking->status_id === 5)) {
                 $booking->refund = "pending";
                 $booking->save();
             }
+            event(new RoomStatusUpdated($booking->room));
+            event(new BookingStatusUpdated($booking));
 
             return response()->json([
                 'status' => 'success',
@@ -402,7 +406,10 @@ class BookingController extends Controller
             $booking = Booking::findOrFail($id);
 
             $booking->payment_status = 'paid';
+            $booking->status_id = 6;
             $booking->save();
+
+            event(new BookingStatusUpdated($booking));
 
             return response()->json([
                 'message' => 'Cập nhật thanh toán thành công',
@@ -424,6 +431,8 @@ class BookingController extends Controller
             $booking->refund = 'refund';
             $booking->save();
 
+            event(new BookingStatusUpdated($booking));
+
             return response()->json([
                 'message' => 'Cập nhật thành công',
                 'status' => 'success'
@@ -442,7 +451,7 @@ class BookingController extends Controller
             $bookedDates = Booking::where('room_id', $roomId)
                 ->where(function ($query) {
                     $query->where('status_id', 1) // Đã duyệt
-                        // ->orWhere('status_id', 3) // Chờ duyệt
+                        ->orWhere('status_id', 3) // Chờ duyệt
                         ->orWhere('status_id', 6) // Đã nhận phòng
                         ->orWhere('status_id', 8);
                 })

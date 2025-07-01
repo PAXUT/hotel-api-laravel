@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Booking;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use App\Events\BookingStatusUpdated;
 
 class CheckExpiredBookings extends Command
 {
@@ -57,19 +58,27 @@ class CheckExpiredBookings extends Command
             $expiredBookings = array_merge($expiredBookings, $case2Bookings);
             Log::info('Case 2 - Unpaid COD bookings: ' . count($case2Bookings));
 
-            // Case 3: Đã qua 21:00 của ngày check-in nhưng chưa nhận phòng
+            // Case 3: Đã qua 14:00 của ngày check-in nhưng chưa nhận phòng
             $case3Bookings = Booking::where(function ($query) use ($currentDate) {
                 $query->whereDate('check_in_date', '<', $currentDate->toDateString())
                     ->orWhere(function ($q) use ($currentDate) {
                         $q->whereDate('check_in_date', $currentDate->toDateString())
-                            ->whereTime('check_in_date', '<', '21:00:00');
+                            ->whereTime('check_in_date', '<', '14:00:00');
                     });
             })
                 ->where('status_id', 1)
                 ->pluck('id')
                 ->toArray();
             $expiredBookings = array_merge($expiredBookings, $case3Bookings);
-            Log::info('Case 3 - Late check-in bookings (after 21:00): ' . count($case3Bookings));
+            Log::info('Case 3 - Late check-in bookings (after 14:00): ' . count($case3Bookings));
+
+            // Case 4: đến hết thời gian đếm ngược mà chưa thanh toán
+            $case4Bookings = Booking::where('payment_countdown', '<', $currentDate)
+                ->where('status_id', 3)
+                ->pluck('id')
+                ->toArray();
+            $expiredBookings = array_merge($expiredBookings, $case4Bookings);
+            Log::info('Case 4 - countdown end: ' . count($case4Bookings));
 
             // đến hạn trả phòng mà chưa trả
             $check = Booking::where(function ($query) use ($currentDate) {
@@ -87,19 +96,33 @@ class CheckExpiredBookings extends Command
 
             // Cập nhật trạng thái cho các booking
             if (!empty($expiredBookings)) {
-                Booking::whereIn('id', $expiredBookings)
-                    ->update(['status_id' => 5]); // 5 là trạng thái hết hạn
-
+                // Booking::whereIn('id', $expiredBookings)
+                //     ->update(['status_id' => 5]); // 5 là trạng thái phòng hết hạn
+                foreach ($expiredBookings as $id) {
+                    $booking = Booking::find($id);
+                    if ($booking) {
+                        $booking->status_id = 5;
+                        $booking->save();
+                        event(new BookingStatusUpdated($booking));
+                    }
+                }
                 $this->info('Updated ' . count($expiredBookings) . ' expired bookings');
                 Log::info('Updated ' . count($expiredBookings) . ' expired bookings with IDs: ' . implode(', ', $expiredBookings));
             } else 
             if (!empty($Bookings)) {
-                Booking::whereIn('id', $Bookings)
-                    ->update(['status_id' => 8]); //trạng thái đến hạn trả phòng
-
+                // Booking::whereIn('id', $Bookings)
+                //     ->update(['status_id' => 8]); //trạng thái đến hạn trả phòng
+                foreach ($Bookings as $id) {
+                    $booking = Booking::find($id);
+                    if ($booking) {
+                        $booking->status_id = 8;
+                        $booking->save();
+                        event(new BookingStatusUpdated($booking));
+                    }
+                }
                 $this->info('Updated ' . count($Bookings) . ' expired bookings');
                 Log::info('Updated ' . count($Bookings) . ' expired bookings with IDs: ' . implode(', ', $Bookings));
-            }else {
+            } else {
                 $this->info('No expired bookings found');
                 Log::info('No expired bookings found at: ' . $currentDate);
             }

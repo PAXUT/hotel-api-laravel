@@ -29,9 +29,11 @@ class Kernel extends ConsoleKernel
         }
 
         // Kiểm tra booking hết hạn
-        $schedule->command('bookings:check-expired')->everyThirtyMinutes()->appendOutputTo(storage_path('logs/expired-bookings.log'));
+        $schedule->command('bookings:check-expired')->everyMinute()->appendOutputTo(storage_path('logs/expired-bookings.log'));
 
         $schedule->command('room:update-status-before-checkin')->everyMinute();
+
+        // $schedule->command('app:check-in-time')->dailyAt('14:00');
     }
 
     /**

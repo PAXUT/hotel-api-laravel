@@ -19,6 +19,7 @@ class Booking extends Model
         'refund',
         'payment_method',
         'payment_status	',
+        'payment_countdown',
         'payment_reference',
         'review',
     ];

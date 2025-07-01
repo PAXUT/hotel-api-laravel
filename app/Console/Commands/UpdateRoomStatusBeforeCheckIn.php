@@ -33,7 +33,7 @@ class UpdateRoomStatusBeforeCheckIn extends Command
         $bookings = Booking::whereDate('check_in_date', $today)->get();
 
         foreach ($bookings as $booking) {
-            if ($booking->status_id === 1) {
+            if ($booking->status_id === 3) {
                 $room = $booking->room;
                 if ($room) {
                     $room->status_room_id = 3; // Cập nhật trạng thái phòng thành 3="khách đã đặt"

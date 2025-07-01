@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use App\Events\RoomStatusUpdated;
 
 class RoomController extends Controller
 {
@@ -20,7 +21,7 @@ class RoomController extends Controller
 
         $rooms = Room::with('roomType', 'status', 'convenients', 'images')->paginate($perPage);
         $emptyrooms = Room::with('roomType', 'status', 'convenients', 'images')->where('status_room_id', '=', '1')->paginate($perPage);
-        $all = Room::with('status', 'images')->get();
+        $all = Room::with('roomType', 'status', 'convenients', 'images')->get();
         // $roomforuser = Room::with('status', 'images')->get();
 
         if ($rooms->isEmpty()) {
@@ -78,6 +79,7 @@ class RoomController extends Controller
                 'description' => $request->description,
                 'status_room_id' => $request->status_id,
             ]);
+            
             // Liên kết các tiện nghi
             if ($request->has('convenients')) {
                 $room->convenients()->attach($request->convenients);
@@ -92,6 +94,7 @@ class RoomController extends Controller
                     ]);
                 }
             }
+            event(new RoomStatusUpdated($room));
             DB::commit(); // Commit transaction
             return response()->json([
                 'message' => 'Tạo phòng thành công',
@@ -111,6 +114,7 @@ class RoomController extends Controller
     public function show(string $id)
     {
         $room = Room::with('roomType', 'status', 'convenients', 'images')->find($id);
+        event(new RoomStatusUpdated($room));
         if (!$room) {
             return response()->json([
                 'message' => 'Không tìm thấy phòng',
@@ -218,6 +222,7 @@ class RoomController extends Controller
                     ]);
                 }
             }
+            event(new RoomStatusUpdated($room));
 
             DB::commit();
             return response()->json([
@@ -278,6 +283,7 @@ class RoomController extends Controller
             }
 
             $room->delete();
+            event(new RoomStatusUpdated($room));
 
             DB::commit();
 
